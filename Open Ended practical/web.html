@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deadlock in Operating Systems</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --secondary: #a855f7;
+            --dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text: #f8fafc;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Ambient Glow Background */
+        .ambient-glow {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 80vw;
+            height: 80vh;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(0,0,0,0) 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Navigation Bar */
+        nav {
+            background: rgba(15, 23, 42, 0.8);
+            padding: 1.2rem 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        nav ul li a {
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            padding: 0.5rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        nav ul li a:hover, nav ul li a.active {
+            color: white;
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        /* Main Content */
+        .container {
+            margin-top: 80px;
+            padding: 2rem;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Page 1 - Start Page */
+        .start-page {
+            text-align: center;
+            min-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 1s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .start-title {
+            font-size: 5rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1.5rem;
+            text-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+        }
+
+        .subtitle {
+            font-size: 1.5rem;
+            color: #94a3b8;
+            margin-bottom: 4rem;
+            max-width: 600px;
+            text-align: center;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
+        }
+
+        .primary-btn {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 1.2rem 3rem;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .primary-btn::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 50%; height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.3), transparent);
+            transform: skewX(-20deg);
+            transition: 0.5s;
+        }
+
+        .primary-btn:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 15px 35px rgba(168, 85, 247, 0.5);
+        }
+
+        .primary-btn:hover::after {
+            left: 150%;
+        }
+
+        /* Page 2 - Deadlock Explanation */
+        .deadlock-page {
+            display: none;
+            background: var(--card-bg);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 24px;
+            padding: 3rem;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            backdrop-filter: blur(20px);
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        .explanation-title {
+            text-align: center;
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #f8fafc, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        .explanation-desc {
+            text-align: center;
+            font-size: 1.2rem;
+            color: #94a3b8;
+            margin-bottom: 3rem;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .danger-btn {
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .danger-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(239, 68, 68, 0.5);
+        }
+
+        .reset-btn {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .reset-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(59, 130, 246, 0.5);
+        }
+
+        /* Traffic Intersection visualization */
+        .intersection-wrapper {
+            position: relative;
+            width: 500px;
+            height: 500px;
+            margin: 0 auto 4rem auto;
+            background: #1e293b;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.05);
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        /* Roads */
+        .road-v {
+            position: absolute;
+            top: 0; left: 180px; width: 140px; height: 100%;
+            background: #334155;
+            border-left: 2px dashed rgba(255,255,255,0.2);
+            border-right: 2px dashed rgba(255,255,255,0.2);
+        }
+        
+        .road-h {
+            position: absolute;
+            top: 180px; left: 0; width: 100%; height: 140px;
+            background: #334155;
+            border-top: 2px dashed rgba(255,255,255,0.2);
+            border-bottom: 2px dashed rgba(255,255,255,0.2);
+        }
+
+        .center-box {
+            position: absolute;
+            top: 180px; left: 180px; width: 140px; height: 140px;
+            background: #334155;
+            z-index: 5;
+        }
+
+        /* Traffic Lights */
+        .tl {
+            position: absolute;
+            width: 30px; height: 80px;
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            z-index: 10;
+        }
+
+        .tl-bulb {
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            background: #333;
+            transition: all 0.3s;
+        }
+
+        .tl.north { top: 90px; left: 140px; }
+        .tl.south { bottom: 90px; right: 140px; }
+        .tl.west { top: 140px; left: 90px; flex-direction: row; width: 80px; height: 30px; }
+        .tl.east { bottom: 140px; right: 90px; flex-direction: row; width: 80px; height: 30px; }
+
+        /* Cars */
+        .car-elem {
+            position: absolute;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            z-index: 20;
+            transition: left 0.5s linear, top 0.5s linear;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            opacity: 0;
+        }
+
+        .car-v { width: 40px; height: 70px; }
+        .car-h { width: 70px; height: 40px; }
+
+        .car-elem.visible {
+            opacity: 1;
+        }
+
+        /* 4 Conditions Cards */
+        .conditions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .condition-card {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255,255,255,0.05);
+            padding: 2rem;
+            border-radius: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .condition-card:hover {
+            transform: translateY(-5px);
+            background: rgba(30, 41, 59, 0.8);
+            border-color: rgba(99, 102, 241, 0.3);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .condition-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+            background: rgba(255,255,255,0.1);
+            width: 70px; height: 70px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 16px;
+        }
+
+        .condition-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: #f8fafc;
+        }
+
+        .condition-card p {
+            color: #94a3b8;
+            line-height: 1.5;
+            font-size: 0.95rem;
+        }
+
+        /* Notifications */
+        .deadlock-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(220, 38, 38, 0.1);
+            pointer-events: none;
+            z-index: 999;
+            display: none;
+            animation: pulseRed 2s infinite;
+        }
+
+        @keyframes pulseRed {
+            0% { background: rgba(220, 38, 38, 0.05); }
+            50% { background: rgba(220, 38, 38, 0.2); border: 5px solid rgba(220, 38, 38, 0.3); }
+            100% { background: rgba(220, 38, 38, 0.05); }
+        }
+
+        .alert-box {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: #0f172a;
+            border: 2px solid #ef4444;
+            padding: 2.5rem;
+            border-radius: 24px;
+            z-index: 2000;
+            text-align: center;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.8), 0 0 50px rgba(239, 68, 68, 0.4);
+            display: none;
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .alert-box.show {
+            display: block;
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .alert-box h2 {
+            color: #ef4444;
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .intersection-wrapper {
+                transform: scale(0.6);
+                margin: -3rem auto;
+            }
+            .start-title {
+                font-size: 3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-glow"></div>
+    <div class="deadlock-overlay" id="deadlockOverlay"></div>
+
+    <div class="alert-box" id="alertBox">
+        <h2>🚨 DEADLOCK DETECTED! 🚨</h2>
+        <p style="color: #cbd5e1; font-size: 1.1rem; margin-bottom: 2rem; max-width: 400px; line-height: 1.5; margin-left:auto; margin-right:auto;">
+            All 4 conditions are met! Cars wait in a circular chain. No one can proceed because the intersection is permanently blocked.
+        </p>
+        <button class="reset-btn" style="margin: 0 auto;" onclick="resetSimulation();">
+            🔄 Resolve & Reset
+        </button>
+    </div>
+
+    <!-- Navigation Bar -->
+    <nav>
+        <ul>
+            <li><a class="nav-link active" onclick="showPage('start', this)">Home</a></li>
+            <li><a class="nav-link" onclick="showPage('deadlock', this)">Simulation</a></li>
+            <li><a class="nav-link" onclick="showPage('deadlock', this)">4 Conditions</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <!-- Page 1: Start Page -->
+        <div id="start" class="start-page">
+            <h1 class="start-title">OS Deadlock</h1>
+            <p class="subtitle">
+                A visual journey into how processes halt and the 4 Coffman conditions that cause Operating System deadlocks.
+            </p>
+            <button class="primary-btn" onclick="showPage('deadlock', document.querySelectorAll('.nav-link')[1])">
+                Initialize Simulation
+            </button>
+        </div>
+
+        <!-- Page 2: Deadlock Explanation -->
+        <div id="deadlock" class="deadlock-page">
+            <h1 class="explanation-title">Traffic Signal Analogy</h1>
+            <p class="explanation-desc">
+                4 cars approach a 4-way intersection. Normally, proper traffic lights manage the intersection resource.
+                But what happens when rules fail and everyone wants to acquire the exact same resource space simultaneously?
+            </p>
+
+            <div class="controls">
+                <button class="danger-btn" onclick="triggerDeadlock()" id="btnDeadlock">
+                    <span>⚡</span> Force Deadlock
+                </button>
+                <button class="reset-btn" onclick="resetSimulation()">
+                    <span>🔄</span> Standard Traffic
+                </button>
+            </div>
+
+            <div class="intersection-wrapper">
+                <div class="road-v"></div>
+                <div class="road-h"></div>
+                <!-- Center Box -->
+                <div class="center-box"></div>
+
+                <!-- Traffic Lights -->
+                <div class="tl north"><div class="tl-bulb red" id="tl-n-r"></div><div class="tl-bulb yellow" id="tl-n-y"></div><div class="tl-bulb green" id="tl-n-g"></div></div>
+                <div class="tl south"><div class="tl-bulb red" id="tl-s-r"></div><div class="tl-bulb yellow" id="tl-s-y"></div><div class="tl-bulb green" id="tl-s-g"></div></div>
+                <div class="tl west"><div class="tl-bulb red" id="tl-w-r"></div><div class="tl-bulb yellow" id="tl-w-y"></div><div class="tl-bulb green" id="tl-w-g"></div></div>
+                <div class="tl east"><div class="tl-bulb red" id="tl-e-r"></div><div class="tl-bulb yellow" id="tl-e-y"></div><div class="tl-bulb green" id="tl-e-g"></div></div>
+
+                <!-- Cars -->
+                <div class="car-elem car-v" id="car-north" style="top: 20px; left: 200px; background: linear-gradient(135deg, #ef4444, #991b1b);">🚙</div>
+                <div class="car-elem car-v" id="car-south" style="top: 410px; left: 260px; background: linear-gradient(135deg, #3b82f6, #1e40af);">🚗</div>
+                <div class="car-elem car-h" id="car-west" style="top: 260px; left: 20px; background: linear-gradient(135deg, #eab308, #854d0e);">🚕</div>
+                <div class="car-elem car-h" id="car-east" style="top: 200px; left: 410px; background: linear-gradient(135deg, #22c55e, #166534);">🚓</div>
+            </div>
+
+            <h2 style="text-align: center; margin-bottom: 2rem; color: #f8fafc; font-size: 2rem;">The 4 Coffman Conditions</h2>
+            <div class="conditions" id="conditions-section">
+                <div class="condition-card">
+                    <div class="condition-icon">🔒</div>
+                    <h3>Mutual Exclusion</h3>
+                    <p>The intersection bounds can only be occupied by one car's specific path at a time. Sharing is physically impossible.</p>
+                </div>
+                <div class="condition-card">
+                    <div class="condition-icon">⚓</div>
+                    <h3>Hold & Wait</h3>
+                    <p>Cars keep their current position in the intersection while waiting for the next segment to become free.</p>
+                </div>
+                <div class="condition-card">
+                    <div class="condition-icon">⛔</div>
+                    <h3>No Preemption</h3>
+                    <p>We cannot physically force cars to back up and yield their acquired space to another car.</p>
+                </div>
+                <div class="condition-card">
+                    <div class="condition-icon">🔄</div>
+                    <h3>Circular Wait</h3>
+                    <p>North waits for West, West waits for South, South waits for East, East waits for North. Result: a locked loop.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let intervalId = null;
+        let isDeadlocked = false;
+        
+        // Base positions for each direction [top, left]
+        const CAR_POS = {
+            north: { start: [20, 200], wait: [110, 200], end: [440, 200] },
+            south: { start: [410, 260], wait: [320, 260], end: [20, 260] },
+            west: { start: [260, 20], wait: [260, 110], end: [260, 440] },
+            east: { start: [200, 410], wait: [200, 320], end: [200, 20] }
+        };
+
+        function showPage(pageId, navElement) {
+            document.querySelectorAll('.start-page, .deadlock-page').forEach(page => {
+                page.style.display = 'none';
+            });
+            document.getElementById(pageId).style.display = 'block';
+            
+            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+            if(navElement) navElement.classList.add('active');
+
+            if (pageId === 'deadlock') {
+                if(!intervalId) resetSimulation();
+            } else {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+        }
+
+        // Set light explicitly
+        function setLight(dir, color) {
+            ['r', 'y', 'g'].forEach(c => {
+                const el = document.getElementById(`tl-${dir}-${c}`);
+                el.style.background = '#333';
+                el.style.boxShadow = 'none';
+            });
+
+            const target = document.getElementById(`tl-${dir}-${color[0]}`);
+            if(color === 'red') { target.style.background = '#ef4444'; target.style.boxShadow = '0 0 15px #ef4444'; }
+            if(color === 'yellow') { target.style.background = '#eab308'; target.style.boxShadow = '0 0 15px #eab308'; }
+            if(color === 'green') { target.style.background = '#22c55e'; target.style.boxShadow = '0 0 15px #22c55e'; }
+        }
+
+        // Apply pos
+        function applyPos(car, posArr) {
+            car.style.top = posArr[0] + 'px';
+            car.style.left = posArr[1] + 'px';
+        }
+
+        function spawnCars() {
+            ['north', 'south', 'west', 'east'].forEach(dir => {
+                const el = document.getElementById(`car-${dir}`);
+                el.style.transition = 'none';
+                applyPos(el, CAR_POS[dir].start);
+                el.classList.add('visible');
+            });
+        }
+
+        function movePhase(state) {
+            ['north', 'south', 'west', 'east'].forEach(dir => {
+                const el = document.getElementById(`car-${dir}`);
+                el.style.transition = 'left 1s linear, top 1s linear';
+                
+                const dirCode = dir.charAt(0);
+                const light = state[dirCode];
+
+                if(light === 'green') {
+                    applyPos(el, CAR_POS[dir].end);
+                    setTimeout(() => {
+                        if(isDeadlocked) return;
+                        el.style.transition = 'none';
+                        applyPos(el, CAR_POS[dir].start);
+                        // small delay before making visible so transition="none" takes effect
+                        setTimeout(() => { el.style.transition = 'left 1s linear, top 1s linear'; }, 50);
+                    }, 1000);
+                } else {
+                    applyPos(el, CAR_POS[dir].wait);
+                }
+            });
+        }
+
+        function resetSimulation() {
+            isDeadlocked = false;
+            clearInterval(intervalId);
+            document.getElementById('deadlockOverlay').style.display = 'none';
+            document.getElementById('alertBox').classList.remove('show');
+            document.getElementById('btnDeadlock').disabled = false;
+            document.getElementById('btnDeadlock').style.opacity = '1';
+
+            spawnCars();
+
+            const seq = [
+                {n: 'green', s: 'green', w: 'red', e: 'red'},
+                {n: 'yellow', s: 'yellow', w: 'red', e: 'red'},
+                {n: 'red', s: 'red', w: 'red', e: 'red'},
+                {n: 'red', s: 'red', w: 'green', e: 'green'},
+                {n: 'red', s: 'red', w: 'yellow', e: 'yellow'},
+                {n: 'red', s: 'red', w: 'red', e: 'red'}
+            ];
+
+            let i = 0;
+            function tick() {
+                const state = seq[i];
+                ['n', 's', 'w', 'e'].forEach(d => setLight(d, state[d]));
+                movePhase(state);
+                i = (i + 1) % seq.length;
+            }
+
+            tick();
+            intervalId = setInterval(tick, 2000);
+        }
+
+        function triggerDeadlock() {
+            if(isDeadlocked) return;
+            isDeadlocked = true;
+            clearInterval(intervalId);
+            
+            document.getElementById('btnDeadlock').disabled = true;
+            document.getElementById('btnDeadlock').style.opacity = '0.5';
+
+            // Set all lights to red
+            ['n', 's', 'w', 'e'].forEach(dir => setLight(dir, 'red'));
+
+            // All cars move to wait point
+            ['north', 'south', 'west', 'east'].forEach(dir => {
+                const el = document.getElementById(`car-${dir}`);
+                el.style.transition = 'left 1s cubic-bezier(0.2, 0.8, 0.2, 1), top 1s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                // Position so they are blocking each other directly in intersection:
+                let x = CAR_POS[dir].wait[1]; let y = CAR_POS[dir].wait[0];
+                if(dir==='north') y=200;
+                if(dir==='south') y=260;
+                if(dir==='west') x=200;
+                if(dir==='east') x=260;
+                
+                el.style.top = y + 'px';
+                el.style.left = x + 'px';
+            });
+
+            setTimeout(() => {
+                document.getElementById('deadlockOverlay').style.display = 'block';
+                document.getElementById('alertBox').classList.add('show');
+            }, 1200);
+        }
+    </script>
+</body>
+</html>
